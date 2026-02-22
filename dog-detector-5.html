@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐾 DOG·SCAN·9000</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap');
+
+  :root {
+    --neon-pink: #ff2d78;
+    --neon-cyan: #00f5ff;
+    --neon-yellow: #f5ff00;
+    --neon-green: #39ff14;
+    --bg: #0a0010;
+    --panel: rgba(255,45,120,0.08);
+    --border: rgba(0,245,255,0.3);
+    --alert: #ff0000;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    font-family: 'Rajdhani', sans-serif;
+    color: var(--neon-cyan);
+    min-height: 100vh;
+    overflow: hidden;
+    transition: background 0.3s ease;
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: 
+      repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,245,255,0.02) 2px, rgba(0,245,255,0.02) 4px),
+      repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(255,45,120,0.01) 2px, rgba(255,45,120,0.01) 4px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body.dog-alert {
+    background: #1a0000;
+    animation: alertPulse 0.5s ease-in-out infinite alternate;
+  }
+
+  @keyframes alertPulse {
+    from { background: #1a0000; }
+    to { background: #3a0000; }
+  }
+
+  body.dog-alert::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(255,0,0,0.3) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 1;
+    animation: radialPulse 0.5s ease-in-out infinite alternate;
+  }
+
+  @keyframes radialPulse {
+    from { opacity: 0.5; }
+    to { opacity: 1; }
+  }
+
+  .scanlines {
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0,0,0,0.15) 0px,
+      rgba(0,0,0,0.15) 1px,
+      transparent 1px,
+      transparent 2px
+    );
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  .container {
+    position: relative;
+    z-index: 10;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    min-height: 100vh;
+    padding: 12px;
+    gap: 10px;
+  }
+
+  /* HEADER */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px));
+    backdrop-filter: blur(10px);
+  }
+
+  .logo {
+    font-family: 'Orbitron', monospace;
+    font-weight: 900;
+    font-size: clamp(1rem, 4vw, 1.5rem);
+    color: var(--neon-pink);
+    text-shadow: 0 0 20px var(--neon-pink), 0 0 40px var(--neon-pink);
+    letter-spacing: 2px;
+    animation: flicker 4s infinite;
+  }
+
+  @keyframes flicker {
+    0%, 95%, 100% { opacity: 1; }
+    96% { opacity: 0.4; }
+    97% { opacity: 1; }
+    98% { opacity: 0.2; }
+    99% { opacity: 1; }
+  }
+
+  .paw-icon {
+    font-size: 1.5rem;
+    animation: spin 3s linear infinite;
+    display: inline-block;
+  }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--neon-green);
+    box-shadow: 0 0 10px var(--neon-green);
+    animation: blink 1s infinite;
+  }
+  .status-dot.inactive { background: #444; box-shadow: none; animation: none; }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+  }
+
+  /* MAIN */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 200px;
+    gap: 10px;
+    min-height: 0;
+  }
+
+  @media (max-width: 600px) {
+    .main { grid-template-columns: 1fr; }
+    .sidebar { grid-row: 1; }
+  }
+
+  /* CAMERA */
+  .camera-wrap {
+    position: relative;
+    border: 2px solid var(--neon-cyan);
+    box-shadow: 0 0 20px rgba(0,245,255,0.3), inset 0 0 20px rgba(0,245,255,0.05);
+    clip-path: polygon(0 0, calc(100% - 30px) 0, 100% 30px, 100% 100%, 30px 100%, 0 calc(100% - 30px));
+    overflow: hidden;
+    background: #000;
+  }
+
+  .camera-wrap.dog-detected {
+    border-color: var(--alert);
+    box-shadow: 0 0 40px rgba(255,0,0,0.8), inset 0 0 30px rgba(255,0,0,0.2);
+  }
+
+  #videoEl {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transform: scaleX(-1);
+  }
+
+  .camera-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  /* Corner brackets */
+  .corner {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border-color: var(--neon-yellow);
+    border-style: solid;
+  }
+  .corner.tl { top: 8px; left: 8px; border-width: 2px 0 0 2px; }
+  .corner.tr { top: 8px; right: 8px; border-width: 2px 2px 0 0; }
+  .corner.bl { bottom: 8px; left: 8px; border-width: 0 0 2px 2px; }
+  .corner.br { bottom: 8px; right: 8px; border-width: 0 2px 2px 0; }
+
+  .scan-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
+    box-shadow: 0 0 10px var(--neon-cyan);
+    animation: scanMove 3s linear infinite;
+    opacity: 0.6;
+  }
+  @keyframes scanMove {
+    from { top: 0%; }
+    to { top: 100%; }
+  }
+
+  .dog-alert-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,0,0,0.15);
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(1.5rem, 6vw, 3rem);
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 30px #ff0000;
+    text-align: center;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .dog-alert-overlay.show { opacity: 1; }
+  .dog-alert-overlay .sub {
+    font-size: 0.8rem;
+    letter-spacing: 3px;
+    color: var(--neon-yellow);
+    text-shadow: 0 0 10px var(--neon-yellow);
+  }
+
+  .no-camera {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: rgba(0,245,255,0.5);
+    font-size: 0.9rem;
+    text-align: center;
+    padding: 20px;
+  }
+
+  .no-camera .big-paw { font-size: 4rem; opacity: 0.3; }
+
+  /* SIDEBAR */
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .panel {
+    border: 1px solid var(--border);
+    background: var(--panel);
+    padding: 12px;
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+    backdrop-filter: blur(10px);
+  }
+
+  .panel-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--neon-pink);
+    text-shadow: 0 0 8px var(--neon-pink);
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255,45,120,0.3);
+  }
+
+  /* CONFIG INPUTS */
+  .config-group {
+    margin-bottom: 10px;
+  }
+
+  .config-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(0,245,255,0.6);
+    margin-bottom: 4px;
+    display: block;
+  }
+
+  .config-input {
+    width: 100%;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(0,245,255,0.3);
+    color: var(--neon-cyan);
+    padding: 6px 8px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.8rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .config-input:focus {
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 10px rgba(0,245,255,0.2);
+  }
+
+  .config-input::placeholder { color: rgba(0,245,255,0.2); font-size: 0.7rem; }
+
+  /* BUTTONS */
+  .btn {
+    width: 100%;
+    padding: 10px;
+    background: transparent;
+    border: 2px solid var(--neon-pink);
+    color: var(--neon-pink);
+    font-family: 'Orbitron', monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+    margin-bottom: 6px;
+  }
+
+  .btn:hover {
+    background: rgba(255,45,120,0.2);
+    box-shadow: 0 0 20px rgba(255,45,120,0.4);
+    text-shadow: 0 0 8px var(--neon-pink);
+  }
+
+  .btn.active {
+    background: rgba(255,45,120,0.3);
+    box-shadow: 0 0 20px rgba(255,45,120,0.6);
+  }
+
+  .btn.cyan {
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+  }
+  .btn.cyan:hover {
+    background: rgba(0,245,255,0.1);
+    box-shadow: 0 0 20px rgba(0,245,255,0.3);
+    text-shadow: 0 0 8px var(--neon-cyan);
+  }
+
+  /* LOG */
+  .log-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 120px;
+    overflow-y: auto;
+  }
+
+  .log-list::-webkit-scrollbar { width: 2px; }
+  .log-list::-webkit-scrollbar-track { background: transparent; }
+  .log-list::-webkit-scrollbar-thumb { background: var(--neon-cyan); }
+
+  .log-item {
+    font-size: 0.65rem;
+    color: rgba(0,245,255,0.6);
+    border-left: 2px solid rgba(0,245,255,0.3);
+    padding-left: 6px;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .log-item.alert {
+    color: var(--neon-pink);
+    border-left-color: var(--neon-pink);
+    text-shadow: 0 0 6px var(--neon-pink);
+  }
+
+  .log-item.success {
+    color: var(--neon-green);
+    border-left-color: var(--neon-green);
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateX(-5px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* STATS */
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(0,245,255,0.1);
+    font-size: 0.7rem;
+  }
+
+  .stat-val {
+    color: var(--neon-yellow);
+    font-family: 'Orbitron', monospace;
+    font-size: 0.65rem;
+    text-shadow: 0 0 6px var(--neon-yellow);
+  }
+
+  /* FOOTER */
+  .footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border: 1px solid rgba(0,245,255,0.15);
+    color: rgba(0,245,255,0.4);
+  }
+
+  .progress-bar {
+    height: 3px;
+    background: rgba(0,245,255,0.1);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-pink));
+    width: 0%;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 8px var(--neon-cyan);
+  }
+
+  /* CONFIDENCE METER */
+  .confidence-wrap {
+    margin: 6px 0;
+  }
+
+  .confidence-bar {
+    height: 6px;
+    background: rgba(0,245,255,0.1);
+    border: 1px solid rgba(0,245,255,0.2);
+    overflow: hidden;
+    margin-top: 3px;
+  }
+
+  .confidence-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--neon-green), var(--neon-yellow), var(--neon-pink));
+    width: 0%;
+    transition: width 0.5s ease;
+    box-shadow: 0 0 6px var(--neon-green);
+  }
+
+  /* INTERVAL select */
+  .interval-btns {
+    display: flex;
+    gap: 4px;
+  }
+
+  .interval-btn {
+    flex: 1;
+    padding: 4px;
+    background: transparent;
+    border: 1px solid rgba(0,245,255,0.3);
+    color: rgba(0,245,255,0.5);
+    font-size: 0.6rem;
+    cursor: pointer;
+    font-family: 'Orbitron', monospace;
+    transition: all 0.2s;
+  }
+
+  .interval-btn.selected {
+    background: rgba(0,245,255,0.15);
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+    box-shadow: 0 0 8px rgba(0,245,255,0.3);
+  }
+</style>
+</head>
+<body>
+<div class="scanlines"></div>
+
+<div class="container">
+  <!-- HEADER -->
+  <header class="header">
+    <div class="logo"><span class="paw-icon">🐾</span> DOG·SCAN·9000</div>
+    <div class="status-bar">
+      <div class="status-dot inactive" id="statusDot"></div>
+      <span id="statusText">離線</span>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="main">
+    <!-- CAMERA -->
+    <div class="camera-wrap" id="cameraWrap">
+      <video id="videoEl" autoplay muted playsinline></video>
+      <canvas id="captureCanvas" style="display:none"></canvas>
+      <div class="camera-overlay">
+        <div class="corner tl"></div>
+        <div class="corner tr"></div>
+        <div class="corner bl"></div>
+        <div class="corner br"></div>
+        <div class="scan-line"></div>
+      </div>
+      <div class="dog-alert-overlay" id="dogAlertOverlay">
+        🚨 DOG DETECTED 🚨
+        <span class="sub">INTRUDER ALERT</span>
+      </div>
+      <div class="no-camera" id="noCameraMsg">
+        <div class="big-paw">🐾</div>
+        <div>按下 ACTIVATE 啟動鏡頭<br>並開始監測狗狗入侵！</div>
+      </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <!-- CONFIG -->
+      <div class="panel">
+        <div class="panel-title">⚙ 系統配置</div>
+        
+        <div class="config-group">
+          <label class="config-label">OpenAI API Key</label>
+          <input type="password" class="config-input" id="apiKey" placeholder="sk-...">
+        </div>
+
+        <div class="config-group">
+          <label class="config-label">Discord Webhook URL</label>
+          <input type="text" class="config-input" id="discordWebhook" value="https://discord.com/api/webhooks/1475072538056065151/OJke3bSq5Pf3lPVjsMrSjC8dRvM2-RXc-phETs6akuCKgqLqLMtPMm1GvdQMlCxElw3D">
+        </div>
+
+        <div class="config-group">
+          <label class="config-label">掃描間隔</label>
+          <div class="interval-btns">
+            <button class="interval-btn" data-val="3000" onclick="setInterval_(this)">3s</button>
+            <button class="interval-btn selected" data-val="5000" onclick="setInterval_(this)">5s</button>
+            <button class="interval-btn" data-val="10000" onclick="setInterval_(this)">10s</button>
+          </div>
+        </div>
+
+        <button class="btn" id="activateBtn" onclick="toggleCamera()">▶ ACTIVATE</button>
+        <button class="btn cyan" id="scanBtn" onclick="toggleScan()" disabled>◈ START SCAN</button>
+      </div>
+
+      <!-- CONFIDENCE -->
+      <div class="panel">
+        <div class="panel-title">📡 偵測信心值</div>
+        <div class="confidence-wrap">
+          <div style="display:flex;justify-content:space-between;font-size:0.65rem;">
+            <span>DOG PROBABILITY</span>
+            <span class="stat-val" id="confVal">0%</span>
+          </div>
+          <div class="confidence-bar">
+            <div class="confidence-fill" id="confFill"></div>
+          </div>
+        </div>
+        <div class="progress-bar" id="scanProgress">
+          <div class="progress-fill" id="scanFill"></div>
+        </div>
+      </div>
+
+      <!-- STATS -->
+      <div class="panel">
+        <div class="panel-title">📊 統計數據</div>
+        <div class="stat-row">
+          <span>偵測次數</span>
+          <span class="stat-val" id="statScans">0</span>
+        </div>
+        <div class="stat-row">
+          <span>狗狗發現</span>
+          <span class="stat-val" id="statDogs">0</span>
+        </div>
+        <div class="stat-row">
+          <span>Discord 通知</span>
+          <span class="stat-val" id="statNotifs">0</span>
+        </div>
+      </div>
+
+      <!-- LOG -->
+      <div class="panel" style="flex:1">
+        <div class="panel-title">📋 事件日誌</div>
+        <ul class="log-list" id="logList">
+          <li class="log-item">系統待命中...</li>
+        </ul>
+      </div>
+    </aside>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <span>DOG·SCAN·9000 v1.0</span>
+    <span id="footerTime">--:--:--</span>
+    <span>MADE WITH 🐾 & ⚡</span>
+  </footer>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────
+let stream = null;
+let scanning = false;
+let scanInterval = null;
+let scanIntervalMs = 5000;
+let dogCount = 0;
+let scanCount = 0;
+let notifCount = 0;
+let audioCtx = null;
+let cooldown = false; // prevent rapid re-alerts
+
+// ── CLOCK ─────────────────────────────────────────────
+setInterval(() => {
+  document.getElementById('footerTime').textContent = new Date().toLocaleTimeString('zh-TW');
+}, 1000);
+
+// ── LOGGER ────────────────────────────────────────────
+function log(msg, type = '') {
+  const list = document.getElementById('logList');
+  const li = document.createElement('li');
+  const time = new Date().toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  li.className = 'log-item ' + type;
+  li.textContent = `[${time}] ${msg}`;
+  list.prepend(li);
+  if (list.children.length > 30) list.removeChild(list.lastChild);
+}
+
+// ── INTERVAL ──────────────────────────────────────────
+function setInterval_(btn) {
+  document.querySelectorAll('.interval-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  scanIntervalMs = parseInt(btn.dataset.val);
+  if (scanning) {
+    clearInterval(scanInterval);
+    scanInterval = setInterval(doScan, scanIntervalMs);
+  }
+  log(`掃描間隔設為 ${scanIntervalMs/1000}s`);
+}
+
+// ── CAMERA ────────────────────────────────────────────
+async function toggleCamera() {
+  const btn = document.getElementById('activateBtn');
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+    document.getElementById('videoEl').srcObject = null;
+    document.getElementById('noCameraMsg').style.display = '';
+    document.getElementById('statusDot').className = 'status-dot inactive';
+    document.getElementById('statusText').textContent = '離線';
+    btn.textContent = '▶ ACTIVATE';
+    btn.classList.remove('active');
+    document.getElementById('scanBtn').disabled = true;
+    if (scanning) toggleScan();
+    log('鏡頭已關閉');
+    return;
+  }
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
+    });
+    document.getElementById('videoEl').srcObject = stream;
+    document.getElementById('noCameraMsg').style.display = 'none';
+    document.getElementById('statusDot').className = 'status-dot';
+    document.getElementById('statusText').textContent = '鏡頭啟動';
+    btn.textContent = '⏹ DEACTIVATE';
+    btn.classList.add('active');
+    document.getElementById('scanBtn').disabled = false;
+    log('🟢 鏡頭已啟動', 'success');
+  } catch(e) {
+    log('❌ 鏡頭啟動失敗: ' + e.message, 'alert');
+  }
+}
+
+// ── SCAN TOGGLE ───────────────────────────────────────
+function toggleScan() {
+  const btn = document.getElementById('scanBtn');
+  if (!stream) return;
+
+  if (!scanning) {
+    const key = document.getElementById('apiKey').value.trim();
+    if (!key) { log('⚠ 請先輸入 OpenAI API Key', 'alert'); return; }
+    scanning = true;
+    btn.textContent = '⏸ STOP SCAN';
+    btn.classList.add('active');
+    document.getElementById('statusText').textContent = '掃描中';
+    log('🔍 開始掃描...', 'success');
+    doScan();
+    scanInterval = setInterval(doScan, scanIntervalMs);
+  } else {
+    scanning = false;
+    clearInterval(scanInterval);
+    btn.textContent = '◈ START SCAN';
+    btn.classList.remove('active');
+    document.getElementById('statusText').textContent = '待命';
+    log('⏸ 掃描暫停');
+    clearAlert();
+  }
+}
+
+// ── CAPTURE FRAME ─────────────────────────────────────
+function captureFrame() {
+  const video = document.getElementById('videoEl');
+  const canvas = document.getElementById('captureCanvas');
+  canvas.width = 320;
+  canvas.height = 240;
+  const ctx = canvas.getContext('2d');
+  ctx.save();
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+  ctx.restore();
+  return canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+}
+
+// ── SCAN ──────────────────────────────────────────────
+async function doScan() {
+  if (!stream || !scanning) return;
+
+  const key = document.getElementById('apiKey').value.trim();
+  if (!key) return;
+
+  scanCount++;
+  document.getElementById('statScans').textContent = scanCount;
+
+  // progress bar animation
+  const fill = document.getElementById('scanFill');
+  fill.style.width = '0%';
+  setTimeout(() => fill.style.width = '100%', 50);
+
+  let base64;
+  try { base64 = captureFrame(); } catch(e) { log('❌ 擷取畫面失敗', 'alert'); return; }
+
+  log('📸 分析畫面中...');
+
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + key
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        max_tokens: 100,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'Is there a dog in this image AND is it clearly moving or active (not still/sleeping)? Reply with JSON only: {"dog": true/false, "moving": true/false, "confidence": 0-100, "description": "brief"}'
+            },
+            {
+              type: 'image_url',
+              image_url: { url: 'data:image/jpeg;base64,' + base64, detail: 'low' }
+            }
+          ]
+        }]
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || 'API Error');
+
+    let text = data.choices[0].message.content.trim();
+    text = text.replace(/```json|```/g, '').trim();
+    const result = JSON.parse(text);
+
+    // Update confidence
+    const conf = result.confidence || 0;
+    document.getElementById('confVal').textContent = conf + '%';
+    document.getElementById('confFill').style.width = conf + '%';
+
+    log(`分析: 🐕${result.dog ? '是' : '否'} 動作:${result.moving ? '是' : '否'} 信心:${conf}%`);
+
+    if (result.dog && result.moving && conf >= 60) {
+      handleDogDetected(result);
+    } else {
+      if (!cooldown) clearAlert();
+    }
+
+  } catch(e) {
+    log('❌ API 錯誤: ' + e.message, 'alert');
+  }
+}
+
+// ── DOG DETECTED ──────────────────────────────────────
+async function handleDogDetected(result) {
+  dogCount++;
+  document.getElementById('statDogs').textContent = dogCount;
+  log(`🚨 偵測到狗狗！ ${result.description}`, 'alert');
+
+  // Visual alert
+  document.body.classList.add('dog-alert');
+  document.getElementById('cameraWrap').classList.add('dog-detected');
+  document.getElementById('dogAlertOverlay').classList.add('show');
+
+  // Sound alert
+  playBeeps();
+
+  // Discord notification
+  const webhook = document.getElementById('discordWebhook').value.trim();
+  if (webhook) {
+    await sendDiscordNotification(webhook, result);
+  }
+
+  // Auto clear after 3s
+  cooldown = true;
+  setTimeout(() => {
+    clearAlert();
+    cooldown = false;
+  }, 3000);
+}
+
+function clearAlert() {
+  document.body.classList.remove('dog-alert');
+  document.getElementById('cameraWrap').classList.remove('dog-detected');
+  document.getElementById('dogAlertOverlay').classList.remove('show');
+}
+
+// ── BEEP SOUND ────────────────────────────────────────
+function playBeeps() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  
+  const playBeep = (startTime) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    
+    osc.type = 'square';
+    osc.frequency.value = 2200; // high frequency
+    gain.gain.value = 0.3;
+    
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    osc.start(startTime);
+    osc.stop(startTime + 0.1); // 100ms short beep
+  };
+
+  const now = audioCtx.currentTime;
+  playBeep(now);
+  playBeep(now + 0.2);
+  playBeep(now + 0.4);
+}
+
+// ── DISCORD ───────────────────────────────────────────
+async function sendDiscordNotification(webhook, result) {
+  try {
+    const now = new Date().toLocaleString('zh-TW');
+    await fetch(webhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: '🐾 DOG·SCAN·9000',
+        avatar_url: 'https://cdn.discordapp.com/embed/avatars/0.png',
+        embeds: [{
+          title: '🚨 DOG DETECTED! 狗狗入侵警報！',
+          description: `**偵測描述：** ${result.description || '偵測到移動中的狗狗'}\n**信心值：** ${result.confidence}%\n**時間：** ${now}`,
+          color: 0xff0000,
+          footer: { text: 'DOG·SCAN·9000 Security System' },
+          thumbnail: { url: 'https://i.imgur.com/removed.png' }
+        }]
+      })
+    });
+    notifCount++;
+    document.getElementById('statNotifs').textContent = notifCount;
+    log('✅ Discord 通知已發送', 'success');
+  } catch(e) {
+    log('❌ Discord 通知失敗: ' + e.message, 'alert');
+  }
+}
+
+// ── INIT ──────────────────────────────────────────────
+log('系統初始化完成 ✨');
+log('請輸入 API Key 並啟動鏡頭');
+</script>
+</body>
+</html>
